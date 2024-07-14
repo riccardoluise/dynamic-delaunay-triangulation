@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triangolazione Dinamica con Gesture Corrette</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <script>
+        let points = [];
+        let timeOffset = 0;
+        let noiseScale = 0.005;
+        let noiseStrength = 1;
+        let touchStartTime;
+        let isTouching = false;
+        let deleteRadius = 30;
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            colorMode(HSB);
+            for (let i = 0; i < 30; i++) {
+                points.push({
+                    x: random(width),
+                    y: random(height),
+                    offsetX: random(1000),
+                    offsetY: random(1000)
+                });
+            }
+        }
+
+        function draw() {
+            background(0, 0.1);
+
+            // Aggiorna le posizioni dei punti usando Perlin noise
+            for (let p of points) {
+                p.x += (noise(p.offsetX, timeOffset) - 0.5) * noiseStrength;
+                p.y += (noise(p.offsetY, timeOffset) - 0.5) * noiseStrength;
+                p.x = (p.x + width) % width;
+                p.y = (p.y + height) % height;
+                p.offsetX += noiseScale;
+                p.offsetY += noiseScale;
+            }
+
+            // Triangolazione
+            for (let i = 0; i < points.length - 2; i++) {
+                for (let j = i + 1; j < points.length - 1; j++) {
+                    for (let k = j + 1; k < points.length; k++) {
+                        drawTriangle(points[i], points[j], points[k]);
+                    }
+                }
+            }
+
+            // Disegna i punti
+            noStroke();
+            for (let p of points) {
+                fill(255);
+                ellipse(p.x, p.y, 6, 6);
+            }
+
+            // Cancella i punti se il tocco è prolungato
+            if (isTouching && millis() - touchStartTime > 200) {
+                points = points.filter(p => 
+                    dist(p.x, p.y, mouseX, mouseY) > deleteRadius
+                );
+            }
+
+            timeOffset += 0.01;
+        }
+
+        function drawTriangle(p1, p2, p3) {
+            let center = {
+                x: (p1.x + p2.x + p3.x) / 3,
+                y: (p1.y + p2.y + p3.y) / 3
+            };
+            
+            let area = abs((p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y)) / 2);
+            let maxArea = (width * height) / 100;
+            
+            if (area < maxArea) {
+                let hue = noise(center.x * 0.01, center.y * 0.01, timeOffset) * 360;
+                let distanceFromCenter = dist(center.x, center.y, width/2, height/2);
+                let maxDistance = dist(0, 0, width/2, height/2);
+                let alpha = map(distanceFromCenter, 0, maxDistance, 255, 50);
+                
+                noStroke();
+                fill(hue, 80, 100, alpha);
+                triangle(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+                
+                stroke(hue, 80, 100, alpha + 50);
+                strokeWeight(1);
+                noFill();
+                triangle(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+            }
+        }
+
+        function touchStarted() {
+            isTouching = true;
+            touchStartTime = millis();
+            return false;
+        }
+
+        function touchEnded() {
+            if (isTouching && millis() - touchStartTime <= 200) {
+                // Tap singolo rapido: aggiungi un punto
+                points.push({
+                    x: mouseX,
+                    y: mouseY,
+                    offsetX: random(1000),
+                    offsetY: random(1000)
+                });
+            }
+            isTouching = false;
+            return false;
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+    </script>
+</body>
+</html>
